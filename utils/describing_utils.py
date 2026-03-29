@@ -4,6 +4,7 @@ import re
 import warnings
 from pathlib import Path
 from typing import Dict, Tuple, Any
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -210,6 +211,91 @@ def _save_figure(output_path: Path, tight: bool = True):
     plt.close()
 
 
+def _ensure_figure_drawn(fig) -> None:
+    """Bar positions / containers are reliable only after a canvas draw (needed in notebooks)."""
+    try:
+        fig.canvas.draw()
+    except Exception:
+        pass
+
+
+def _bar_rectangle_patches(ax) -> list:
+    """Rectangles that belong to bar plots (excludes axes background patch when listed)."""
+    rects: list = []
+    for container in ax.containers:
+        p = getattr(container, "patches", None)
+        if p is not None:
+            rects.extend(p)
+        else:
+            try:
+                rects.extend(container)
+            except TypeError:
+                pass
+    if rects:
+        return [p for p in rects if isinstance(p, mpatches.Rectangle)]
+    out = [p for p in ax.patches if isinstance(p, mpatches.Rectangle)]
+    if ax.patch is not None and ax.patch in out:
+        out.remove(ax.patch)
+    return out
+
+
+def _annotate_vertical_bar_tops(ax, fmt: str, fontsize: int = 8, y_pad_frac: float = 0.16) -> None:
+    """Place numeric labels above each vertical bar; clip_on=False so labels survive tight_layout/savefig."""
+    _ensure_figure_drawn(ax.figure)
+    for patch in _bar_rectangle_patches(ax):
+        h = patch.get_height()
+        w = patch.get_width()
+        if h <= 0 or not np.isfinite(h) or w <= 0:
+            continue
+        x = patch.get_x() + w / 2
+        ax.annotate(
+            fmt % h,
+            (x, h),
+            textcoords="offset points",
+            xytext=(0, 4),
+            ha="center",
+            va="bottom",
+            fontsize=fontsize,
+            clip_on=False,
+        )
+    y0, y1 = ax.get_ylim()
+    if y1 >= y0:
+        ax.set_ylim(y0, y1 + (y1 - y0) * y_pad_frac)
+    else:
+        ax.set_ylim(y1 - (y0 - y1) * y_pad_frac, y0)
+
+
+def _annotate_stacked_bar_segment_centers(ax, fmt: str, fontsize: int = 8, min_height: float = 0.03) -> None:
+    """Label each stacked segment with its height at the segment midpoint."""
+    _ensure_figure_drawn(ax.figure)
+    for patch in _bar_rectangle_patches(ax):
+        h = patch.get_height()
+        w = patch.get_width()
+        if h < min_height or not np.isfinite(h) or w <= 0:
+            continue
+        x = patch.get_x() + w / 2
+        y = patch.get_y() + h / 2
+        ax.annotate(
+            fmt % h,
+            (x, y),
+            ha="center",
+            va="center",
+            fontsize=fontsize,
+            clip_on=False,
+        )
+
+
+def _pie_autopct_counts_and_pct(values):
+    """Pie autopct: absolute count and percentage per wedge."""
+    total = float(np.sum(values))
+
+    def autopct(pct: float) -> str:
+        n = int(round(pct * total / 100.0)) if total else 0
+        return f"{n}\n({pct:.1f}%)"
+
+    return autopct
+
+
 def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, prefix: str = "dataset", full: bool = True) -> None:
     """
     Save a broad EDA bundle with plots for missing values, target balance, distributions,
@@ -219,27 +305,35 @@ def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, pref
 
     # Missing values bar chart
     missing_percent = (df.isna().mean() * 100).sort_values(ascending=False)
-    plt.figure(figsize=(12, 6))
-    missing_percent[missing_percent > 0].plot(kind="bar")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    missing_percent[missing_percent > 0].plot(kind="bar", ax=ax)
     plt.title("Missing Values Percentage by Feature")
     plt.ylabel("Missing Percentage")
     plt.xlabel("Feature")
+    plt.xticks(rotation=45, ha="right")
+    _annotate_vertical_bar_tops(ax, fmt="%.2f", fontsize=7)
     _save_figure(output_dir / f"{prefix}_missing_values.png")
 
     # Dtype distribution
     dtype_counts = df.dtypes.astype(str).value_counts()
     plt.figure(figsize=(8, 5))
-    plt.pie(dtype_counts.values, labels=dtype_counts.index, autopct="%1.1f%%", startangle=90)
+    plt.pie(
+        dtype_counts.values,
+        labels=dtype_counts.index,
+        autopct=_pie_autopct_counts_and_pct(dtype_counts.values),
+        startangle=90,
+    )
     plt.title("Distribution of Column Data Types")
     _save_figure(output_dir / f"{prefix}_dtype_distribution.png")
 
     # Target distribution
     if "is_canceled" in df.columns:
-        plt.figure(figsize=(6, 4))
-        sns.countplot(data=df, x="is_canceled")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        sns.countplot(data=df, x="is_canceled", ax=ax)
         plt.title("Target Class Distribution: is_canceled")
         plt.xlabel("Cancellation Status")
         plt.ylabel("Count")
+        _annotate_vertical_bar_tops(ax, fmt="%.0f", fontsize=9)
         _save_figure(output_dir / f"{prefix}_target_distribution.png")
 
     numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
@@ -248,27 +342,51 @@ def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, pref
     # Histograms
     if numeric_cols:
         top_numeric = numeric_cols[: min(12, len(numeric_cols))]
-        df[top_numeric].hist(figsize=(16, 12), bins=30)
+        hist_axes = df[top_numeric].hist(figsize=(16, 12), bins=30)
         plt.suptitle("Numerical Feature Distributions", y=1.02)
+        for ax, col in zip(np.atleast_1d(hist_axes).ravel(), top_numeric):
+            s = df[col].dropna()
+            if len(s) == 0:
+                continue
+            ax.text(
+                0.98,
+                0.98,
+                f"n={len(s):,}\nmedian={s.median():.4g}",
+                transform=ax.transAxes,
+                ha="right",
+                va="top",
+                fontsize=8,
+                bbox=dict(boxstyle="round,pad=0.25", facecolor="white", alpha=0.85),
+            )
         _save_figure(output_dir / f"{prefix}_numeric_histograms.png")
 
         plt.figure(figsize=(14, max(6, len(top_numeric) * 0.5)))
         sns.boxplot(data=df[top_numeric], orient="h")
         plt.title("Boxplots for Selected Numerical Features")
+        plt.figtext(0.99, 0.01, f"n={len(df):,} rows", ha="right", fontsize=9)
         _save_figure(output_dir / f"{prefix}_numeric_boxplots.png")
 
         # Save one boxplot per selected numerical feature for easier interpretation.
         for column in top_numeric:
             plt.figure(figsize=(9, 4.5))
+            s = df[column].dropna()
+            med = s.median()
             sns.boxplot(x=df[column])
-            plt.title(f"Boxplot of {column}")
+            plt.title(f"Boxplot of {column} (n={len(s):,}, median={med:.4g})")
             plt.xlabel(column)
             safe_column_name = normalize_column_name(column)
             _save_figure(output_dir / f"{prefix}_numeric_boxplot_{safe_column_name}.png")
 
         corr = df[["is_canceled"] + top_numeric].corr(numeric_only=True) if "is_canceled" in df.columns else df[top_numeric].corr(numeric_only=True)
         plt.figure(figsize=(12, 9))
-        sns.heatmap(corr, cmap="coolwarm", center=0)
+        sns.heatmap(
+            corr,
+            cmap="coolwarm",
+            center=0,
+            annot=True,
+            fmt=".3f",
+            annot_kws={"size": 7},
+        )
         plt.title("Correlation Heatmap")
         _save_figure(output_dir / f"{prefix}_correlation_heatmap.png")
 
@@ -276,21 +394,25 @@ def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, pref
 
     if categorical_cols:
         cat_cardinality = df[categorical_cols].nunique().sort_values(ascending=False).head(15)
-        plt.figure(figsize=(12, 6))
-        cat_cardinality.plot(kind="bar")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        cat_cardinality.plot(kind="bar", ax=ax)
         plt.title("Top Categorical Features by Cardinality")
         plt.ylabel("Unique Values")
         plt.xlabel("Feature")
+        plt.xticks(rotation=45, ha="right")
+        _annotate_vertical_bar_tops(ax, fmt="%.0f", fontsize=8)
         _save_figure(output_dir / f"{prefix}_categorical_cardinality.png")
 
     # Domain-oriented plots for the hotel dataset
     if full and {"hotel", "is_canceled"}.issubset(df.columns):
-        plt.figure(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(8, 5))
         cancellation_by_hotel = pd.crosstab(df["hotel"], df["is_canceled"], normalize="index")
-        cancellation_by_hotel.plot(kind="bar", stacked=True)
+        cancellation_by_hotel.plot(kind="bar", stacked=True, ax=ax)
         plt.title("Cancellation Share by Hotel Type")
         plt.ylabel("Proportion")
         plt.legend(title="is_canceled")
+        plt.xticks(rotation=0)
+        _annotate_stacked_bar_segment_centers(ax, fmt="%.2f", fontsize=8)
         _save_figure(output_dir / f"{prefix}_hotel_vs_cancellation.png")
 
     if full and {"arrival_date_month", "is_canceled"}.issubset(df.columns):
@@ -300,34 +422,47 @@ def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, pref
         ]
         month_series = df["arrival_date_month"].astype(str)
         order = [m for m in monthly_order if m in month_series.unique().tolist()] or sorted(month_series.unique().tolist())
-        plt.figure(figsize=(12, 5))
-        sns.countplot(data=df, x="arrival_date_month", hue="is_canceled", order=order)
+        fig, ax = plt.subplots(figsize=(12, 5))
+        sns.countplot(data=df, x="arrival_date_month", hue="is_canceled", order=order, ax=ax)
         plt.title("Bookings and Cancellations by Arrival Month")
         plt.xticks(rotation=45)
+        _annotate_vertical_bar_tops(ax, fmt="%.0f", fontsize=6, y_pad_frac=0.22)
         _save_figure(output_dir / f"{prefix}_bookings_by_month.png")
 
     if full and {"lead_time", "is_canceled"}.issubset(df.columns):
+        lead_sample = df.sample(min(25000, len(df)), random_state=RANDOM_STATE)
+        counts = lead_sample["is_canceled"].value_counts().sort_index()
+        count_str = ", ".join(f"{int(k)}: {int(v):,}" for k, v in counts.items())
         plt.figure(figsize=(10, 5))
-        sns.kdeplot(data=df.sample(min(25000, len(df)), random_state=RANDOM_STATE), x="lead_time", hue="is_canceled", fill=True, common_norm=False)
-        plt.title("Lead Time Distribution by Cancellation Status")
+        sns.kdeplot(
+            data=lead_sample,
+            x="lead_time",
+            hue="is_canceled",
+            fill=True,
+            common_norm=False,
+        )
+        plt.title(f"Lead Time Distribution by Cancellation Status (sample n by class: {count_str})")
         _save_figure(output_dir / f"{prefix}_lead_time_by_target.png")
 
     if full and {"adr", "is_canceled"}.issubset(df.columns):
         sample_df = df.sample(min(20000, len(df)), random_state=RANDOM_STATE)
+        medians = sample_df.groupby("is_canceled", observed=True)["adr"].median()
+        med_str = ", ".join(f"{k}: {v:.2f}" for k, v in medians.items())
         plt.figure(figsize=(9, 5))
         sns.boxplot(data=sample_df, x="is_canceled", y="adr")
-        plt.title("ADR Distribution by Cancellation Status")
+        plt.title(f"ADR by Cancellation Status (n={len(sample_df):,}; medians {med_str})")
         _save_figure(output_dir / f"{prefix}_adr_by_target.png")
 
     if full and {"market_segment", "is_canceled"}.issubset(df.columns):
         segment_cancel = (
             df.groupby("market_segment")["is_canceled"].mean().sort_values(ascending=False).head(12)
         )
-        plt.figure(figsize=(12, 5))
-        sns.barplot(x=segment_cancel.index, y=segment_cancel.values)
+        fig, ax = plt.subplots(figsize=(12, 5))
+        sns.barplot(x=segment_cancel.index, y=segment_cancel.values, ax=ax)
         plt.title("Cancellation Rate by Market Segment")
         plt.ylabel("Cancellation Rate")
         plt.xticks(rotation=45)
+        _annotate_vertical_bar_tops(ax, fmt="%.3f", fontsize=8)
         _save_figure(output_dir / f"{prefix}_market_segment_cancel_rate.png")
 
 
