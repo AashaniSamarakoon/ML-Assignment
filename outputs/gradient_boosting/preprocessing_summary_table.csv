@@ -1,0 +1,9 @@
+item,value
+initial_shape,"[119390, 32]"
+duplicate_rows_removed,31994
+dropped_columns,"[""reservation_status"", ""reservation_status_date"", ""company""]"
+engineered_features,"[""arrival_month_num"", ""arrival_season"", ""total_nights"", ""total_guests"", ""is_family"", ""room_type_changed"", ""previous_total_bookings"", ""lead_time_per_night""]"
+removed_rows,"{""zero_total_guests"": 166, ""negative_values_set_to_nan_adr"": 1}"
+high_missing_columns,"{""company"": 93.98}"
+leakage_columns_removed,"[""reservation_status"", ""reservation_status_date""]"
+final_shape,"[87230, 37]"
