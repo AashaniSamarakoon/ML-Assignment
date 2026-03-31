@@ -1,0 +1,8 @@
+Dataset link:
+GitHub repository link:
+YouTube presentation/demo link:
+
+Notes:
+- Make sure the GitHub repository is public.
+- Make sure the repository shows meaningful commit history.
+- Append all required links in this file before submission.
