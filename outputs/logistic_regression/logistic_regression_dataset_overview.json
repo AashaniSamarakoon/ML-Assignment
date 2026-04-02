@@ -1,0 +1,9 @@
+{
+    "rows": 119390,
+    "columns": 32,
+    "duplicate_rows": 31994,
+    "total_missing_cells": 129425,
+    "numeric_columns": 20,
+    "categorical_columns": 12,
+    "memory_usage_mb": 104.83
+}
