@@ -1,0 +1,13 @@
+column,missing_count,missing_percent,unique_count,top_value,top_frequency
+agent,12141,13.92,333,9,28721
+country,447,0.51,177,PRT,27355
+arrival_date_month,0,0.0,12,August,11242
+assigned_room_type,0,0.0,11,A,46283
+reserved_room_type,0,0.0,9,A,56436
+market_segment,0,0.0,8,Online TA,51553
+meal,0,0.0,5,BB,67907
+distribution_channel,0,0.0,5,TA/TO,69028
+customer_type,0,0.0,4,Transient,71862
+arrival_season,0,0.0,4,Summer,29041
+deposit_type,0,0.0,3,No Deposit,86085
+hotel,0,0.0,2,City Hotel,53274

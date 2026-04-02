@@ -1,0 +1,8 @@
+{
+    "classifier__min_samples_split": 2,
+    "classifier__min_samples_leaf": 5,
+    "classifier__max_depth": 16,
+    "classifier__criterion": "gini",
+    "classifier__class_weight": "balanced",
+    "classifier__ccp_alpha": 0.0001
+}

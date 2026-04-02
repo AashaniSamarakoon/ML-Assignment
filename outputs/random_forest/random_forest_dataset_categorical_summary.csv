@@ -1,0 +1,13 @@
+column,missing_count,missing_percent,unique_count,top_value,top_frequency
+country,488,0.41,177,PRT,48590
+reservation_status_date,0,0.0,926,2015-10-21,1461
+arrival_date_month,0,0.0,12,August,13877
+assigned_room_type,0,0.0,12,A,74053
+reserved_room_type,0,0.0,10,A,85994
+market_segment,0,0.0,8,Online TA,56477
+meal,0,0.0,5,BB,92310
+distribution_channel,0,0.0,5,TA/TO,97870
+customer_type,0,0.0,4,Transient,89613
+deposit_type,0,0.0,3,No Deposit,104641
+reservation_status,0,0.0,3,Check-Out,75166
+hotel,0,0.0,2,City Hotel,79330

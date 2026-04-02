@@ -1,0 +1,18 @@
+{
+    "model_name": "Logistic Regression",
+    "accuracy": 0.7659062249226184,
+    "balanced_accuracy": 0.7767631092233135,
+    "precision": 0.5514769142529395,
+    "recall": 0.8009162848812995,
+    "specificity": 0.7526099335653275,
+    "f1": 0.6531929347826086,
+    "f2": 0.7344740661523184,
+    "roc_auc": 0.8478887645807182,
+    "average_precision_pr_auc": 0.6648835379351652,
+    "mcc": 0.5047028181484823,
+    "cohen_kappa": 0.48543637490268354,
+    "brier_score": 0.16205235010759728,
+    "log_loss": 0.4909446844161882,
+    "threshold": 0.5,
+    "test_rows": 17446
+}
