@@ -16,7 +16,7 @@ sns.set_theme(style="whitegrid", context="notebook")
 RANDOM_STATE = 42
 
 
-# Generic filesystem helpers
+# Generic filesystem helper
 
 def get_project_root() -> Path:
     """
