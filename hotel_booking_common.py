@@ -42,15 +42,9 @@ sns.set_theme(style="whitegrid", context="notebook")
 RANDOM_STATE = 42
 
 
-# ------------------------------------------------------------
 # Generic filesystem helpers
-# ------------------------------------------------------------
 
 def get_project_root() -> Path:
-    """
-    Resolve the project root folder. This lets the notebooks run whether they are
-    opened from the project root or inside a subfolder.
-    """
     cwd = Path.cwd()
     candidates = [cwd, cwd.parent, cwd.parent.parent]
     for candidate in candidates:
@@ -60,18 +54,12 @@ def get_project_root() -> Path:
 
 
 def ensure_dir(path: Path | str) -> Path:
-    """
-    Create a directory if it does not already exist and return it as a Path.
-    """
     path = Path(path)
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def save_json(data: Dict[str, Any], filepath: Path | str) -> None:
-    """
-    Save a Python dictionary as a JSON file with indentation for readability.
-    """
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
@@ -79,9 +67,6 @@ def save_json(data: Dict[str, Any], filepath: Path | str) -> None:
 
 
 def normalize_column_name(column_name: str) -> str:
-    """
-    Standardize column names to snake_case for stable downstream processing.
-    """
     column_name = str(column_name).strip().lower()
     column_name = re.sub(r"[^a-z0-9]+", "_", column_name)
     column_name = re.sub(r"_+", "_", column_name).strip("_")
@@ -89,24 +74,17 @@ def normalize_column_name(column_name: str) -> str:
 
 
 def normalize_dataframe_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Return a copy of the dataframe with normalized column names.
-    """
     df = df.copy()
     df.columns = [normalize_column_name(col) for col in df.columns]
     return df
 
 
 def find_dataset_file(dataset_dir: Path | str) -> Path:
-    """
-    Find the dataset file inside the dataset folder. The notebook expects the user
-    to place the Hotel Booking Demand file in the project-level dataset folder.
-    """
     dataset_dir = Path(dataset_dir)
     if not dataset_dir.exists():
         raise FileNotFoundError(f"Dataset folder was not found: {dataset_dir}")
 
-    supported_patterns = ["*.csv", "*.xlsx", "*.xls"]
+    supported_patterns = ["*.csv"]
     files = []
     for pattern in supported_patterns:
         files.extend(dataset_dir.glob(pattern))
@@ -122,15 +100,10 @@ def find_dataset_file(dataset_dir: Path | str) -> Path:
 
 
 def load_dataset(dataset_dir: Path | str) -> Tuple[pd.DataFrame, Path]:
-    """
-    Load the first supported file from the dataset folder.
-    """
     file_path = find_dataset_file(dataset_dir)
 
     if file_path.suffix.lower() == ".csv":
         df = pd.read_csv(file_path)
-    elif file_path.suffix.lower() in {".xlsx", ".xls"}:
-        df = pd.read_excel(file_path)
     else:
         raise ValueError(f"Unsupported file type: {file_path.suffix}")
 
@@ -138,15 +111,10 @@ def load_dataset(dataset_dir: Path | str) -> Tuple[pd.DataFrame, Path]:
     return df, file_path
 
 
-# ------------------------------------------------------------
+
 # Custom preprocessing transformers
-# ------------------------------------------------------------
 
 class IQRClipper(BaseEstimator, TransformerMixin):
-    """
-    Clip numeric values using the IQR rule to reduce the influence of extreme outliers.
-    This transformer is especially useful for variables such as ADR and lead time.
-    """
 
     def __init__(self, factor: float = 1.5):
         self.factor = factor
@@ -188,9 +156,7 @@ def make_one_hot_encoder():
         return OneHotEncoder(handle_unknown="ignore", sparse=True)
 
 
-# ------------------------------------------------------------
 # Dataset understanding, anomaly detection, and visualization
-# ------------------------------------------------------------
 
 def detect_dataset_anomalies(df: pd.DataFrame) -> Dict[str, Any]:
     """
@@ -377,10 +343,6 @@ def _pie_autopct_counts_and_pct(values):
 
 
 def create_dataset_visualizations(df: pd.DataFrame, output_dir: Path | str, prefix: str = "dataset", full: bool = True) -> None:
-    """
-    Save a broad EDA bundle with plots for missing values, target balance, distributions,
-    correlations, and selected categorical relationships.
-    """
     output_dir = ensure_dir(output_dir)
 
     # Missing values bar chart
@@ -585,9 +547,7 @@ def create_dataset_description_bundle(
     }
 
 
-# ------------------------------------------------------------
 # Hotel dataset specific preprocessing and feature engineering
-# ------------------------------------------------------------
 
 def coerce_target_binary(y: pd.Series) -> pd.Series:
     """
@@ -612,10 +572,7 @@ def coerce_target_binary(y: pd.Series) -> pd.Series:
 
 
 def prepare_hotel_booking_dataframe(df: pd.DataFrame, target_col: str = "is_canceled") -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """
-    Perform assignment-friendly preprocessing analysis and domain-aware feature engineering.
-    The actual imputation and encoding remain inside the ML pipeline to avoid leakage.
-    """
+
     df = normalize_dataframe_columns(df)
     if target_col not in df.columns:
         raise ValueError(
@@ -646,7 +603,7 @@ def prepare_hotel_booking_dataframe(df: pd.DataFrame, target_col: str = "is_canc
         notes["leakage_columns_removed"] = leakage_cols
         notes["dropped_columns"].extend(leakage_cols)
 
-    # Drop extremely sparse columns if necessary (company is usually very sparse)
+    # Drop extremely sparse columns
     missing_ratio = df.isna().mean().sort_values(ascending=False)
     notes["high_missing_columns"] = {
         col: round(val * 100, 2) for col, val in missing_ratio[missing_ratio > 0.2].to_dict().items()
@@ -811,10 +768,6 @@ def build_train_test_split(
     y = df[target_col].copy()
     return train_test_split(X, y, test_size=test_size, random_state=random_state, stratify=y)
 
-
-# ------------------------------------------------------------
-# Evaluation and model interpretation helpers
-# ------------------------------------------------------------
 
 def specificity_score(y_true, y_pred) -> float:
     """
@@ -1033,9 +986,7 @@ def summarize_preprocessing_notes(notes: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ------------------------------------------------------------
 # Comparison notebook helpers
-# ------------------------------------------------------------
 
 def compare_models_on_test_set(
     model_paths: Dict[str, Path],

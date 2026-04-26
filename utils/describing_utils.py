@@ -220,7 +220,6 @@ def _ensure_figure_drawn(fig) -> None:
 
 
 def _bar_rectangle_patches(ax) -> list:
-    """Rectangles that belong to bar plots (excludes axes background patch when listed)."""
     rects: list = []
     for container in ax.containers:
         p = getattr(container, "patches", None)
@@ -240,7 +239,6 @@ def _bar_rectangle_patches(ax) -> list:
 
 
 def _annotate_vertical_bar_tops(ax, fmt: str, fontsize: int = 8, y_pad_frac: float = 0.16) -> None:
-    """Place numeric labels above each vertical bar; clip_on=False so labels survive tight_layout/savefig."""
     _ensure_figure_drawn(ax.figure)
     for patch in _bar_rectangle_patches(ax):
         h = patch.get_height()
@@ -266,7 +264,6 @@ def _annotate_vertical_bar_tops(ax, fmt: str, fontsize: int = 8, y_pad_frac: flo
 
 
 def _annotate_stacked_bar_segment_centers(ax, fmt: str, fontsize: int = 8, min_height: float = 0.03) -> None:
-    """Label each stacked segment with its height at the segment midpoint."""
     _ensure_figure_drawn(ax.figure)
     for patch in _bar_rectangle_patches(ax):
         h = patch.get_height()
@@ -286,7 +283,6 @@ def _annotate_stacked_bar_segment_centers(ax, fmt: str, fontsize: int = 8, min_h
 
 
 def _pie_autopct_counts_and_pct(values):
-    """Pie autopct: absolute count and percentage per wedge."""
     total = float(np.sum(values))
 
     def autopct(pct: float) -> str:
