@@ -612,10 +612,7 @@ def coerce_target_binary(y: pd.Series) -> pd.Series:
 
 
 def prepare_hotel_booking_dataframe(df: pd.DataFrame, target_col: str = "is_canceled") -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """
-    Perform assignment-friendly preprocessing analysis and domain-aware feature engineering.
-    The actual imputation and encoding remain inside the ML pipeline to avoid leakage.
-    """
+
     df = normalize_dataframe_columns(df)
     if target_col not in df.columns:
         raise ValueError(
